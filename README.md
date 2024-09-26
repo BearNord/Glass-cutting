@@ -7,7 +7,7 @@ Item: an item is a glass piece to cut. An item i is characterized by a pair
 	 
 Stack: a stack $$s = (i_1, i_2, \ldots , i_j )$$ is an ordered sequence of items such that
 	$$i_1 <_{cut} i_2 <_{cut} \ldots <_{cut} i_j$$ , with $$<_{cut}$$ the partial order operator. For
-	two items $$i_1 and i_2, i_1 <_cut i_2$$ means that item $$i_1$$ has to be cut before
+	two items $$i_1 \text{ and } i_2, i_1 <_{cut} i_2$$ means that item $$i_1$$ has to be cut before
 	item $$i_2$$. This order comes from some scheduling constraints related to the
 	deliveries and item processing.
    
