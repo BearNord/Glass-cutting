@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from typing import Optional, List
+from collections import defaultdict
 
 
 # Global variables
@@ -32,6 +34,8 @@ class Defect:
 class Bin:
     """Class for a bin, so a jumbo glass plate."""
     id: int
+    width: int
+    height: int
     defects: list[Defect]
 
 
@@ -54,4 +58,11 @@ class Stack:
 class Batch:
     """Class for a stack of items to cut."""
     stacks: list[Stack]
+
+class Node:
+    def __init__(self, parent: Optional['Node'] = None):
+        self.parent: Optional['Node'] = parent
+        self.children: List['Node'] = []
+        self.type : int = -2 
+        self.cut: int = 0 
     
