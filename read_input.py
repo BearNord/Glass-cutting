@@ -9,7 +9,7 @@ from classes import Bin, Batch, Item, Stack, Defect
 
 def read_instance(id: str = "A1") -> tuple[list[Bin], Batch]:
     """
-    TODO
+        Reads in a particular dataset which consists of a batch and a defect table.
     """
     dataset = id[0]
 
