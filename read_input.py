@@ -1,7 +1,3 @@
-# TODO: We need a function which reads in input files (batch.csv, defect.csv)
-# returns a list of bins and a batch
-
-
 import os
 import pandas as pd
 from classes import Bin, Batch, Item, Stack, Defect
