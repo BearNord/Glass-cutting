@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, List
 from collections import defaultdict
+from itertools import count
 
 
 # Global variables
@@ -60,9 +61,15 @@ class Batch:
     stacks: list[Stack]
 
 class Node:
-    def __init__(self, parent: Optional['Node'] = None):
+    
+    def __init__(self, parent: Optional['Node'] = None, type: Optional[int] = -2, 
+                 cut: Optional[int] = 0, bin: Bin = None ):
         self.parent: Optional['Node'] = parent
         self.children: List['Node'] = []
-        self.type : int = -2 
-        self.cut: int = 0 
+        self.type : int = type # >= 0 Item_Id, -1: waste, -2: Branch, -3: Residual
+        self.cut: int = cut
+        self.bin = bin
+
+    def add_children(self, child: 'Node'):
+        self.children.append(child)
     
