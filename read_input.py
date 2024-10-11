@@ -5,7 +5,16 @@ from classes import Bin, Batch, Item, Stack, Defect, WIDTH_PLATES, HEIGHT_PLATES
 
 def read_instance(id: str = "A1") -> tuple[list[Bin], Batch]:
     """
-        Reads in a particular dataset which consists of a batch and a defect table.
+    Loads a dataset instance based on the given ID, returning Bin and Batch data.
+
+    Parameters:
+        id (str): Dataset instance ID (e.g., "A1"), where the first character 
+                  indicates the dataset. Defaults to "A1".
+
+    Returns:
+        tuple[list[Bin], Batch]: A tuple with:
+            - List of Bin objects, each containing defect data.
+            - A Batch object with items to cut.
     """
     dataset = id[0]
 
