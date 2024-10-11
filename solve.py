@@ -14,7 +14,7 @@ def first_fit_solve(id: str = "A1"):
     bins, batch = read_instance(id)
 
     # Construct the root and the residual
-    root, l0_residual = start_new_bin(bins, trees)
+    root = start_new_bin(bins, trees)
 
     # While there are items to cut
     while batch.stacks: 
@@ -84,7 +84,7 @@ def place_item(current_item: Item, residuals: list[Residual]):
         x, y = l0_residual.find_place(current_item.width, current_item.length)
 
 
-def start_new_bin(bins: list[Bin], trees) -> tuple[Node, Residual]:
+def start_new_bin(bins: list[Bin], trees) -> Node:
     # Take out the first bin from bins
     bin: Bin = bins.pop(0)
 
@@ -99,19 +99,10 @@ def start_new_bin(bins: list[Bin], trees) -> tuple[Node, Residual]:
         cut = 0,
         residual = Residual(0, 0, bin.width, bin.height, bin.defects)
     )
-
-    # Make a residual, identical to the first bin.
-    residual = Residual(
-        x = 0, 
-        y = 0, 
-        width = bin.width, 
-        height = bin.height, 
-        defects = bin.defects,
-    )
     
     #Append node to tree
     trees.append(root)
-    return root, residual
+    return root
 
 
 def vertical_cut(original: Residual, width: int) -> Residual:
