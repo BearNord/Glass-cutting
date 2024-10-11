@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
 from collections import defaultdict
-import itertools
+
 
 
 # Global variables
