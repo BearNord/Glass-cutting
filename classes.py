@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
-from collections import defaultdict
-
+from enum import Enum, auto
 
 
 # Global variables
@@ -20,6 +19,23 @@ MIN_2_CUT: int = 100
 # Minimum width and height of wastes
 MIN_WASTE: int = 20
 
+
+class Place(Enum):
+    """
+    Enumeration for different directional positions during the trimming process.
+    
+    Attributes:
+        NONE: cannot be cut
+        LEFT: means do a vertical cut, and the left is suitable for the item
+        RIGHT: do vertical and right is suitable
+        DOWN: do horizontal and up is suitable
+        UP: do horizontal and down is suitable
+    """
+    NONE = 0
+    LEFT = auto()
+    RIGHT = auto()
+    DOWN = auto()
+    UP = auto()
 
 @dataclass
 class Defect:
@@ -205,7 +221,7 @@ class Residual:
             ): defects.append(defect)
         return defects
     
-    def find_place(self, width: int, length: int) -> tuple[int, int]:
+    def find_place(self, width: int, length: int, is_vertical: bool) -> tuple[int, int]:
         """
         Finds an available position for a rectangle with the specified width and length, 
         avoiding defects. Starts with bottom left, first go up, then right.
@@ -223,24 +239,49 @@ class Residual:
 
         # If there are defects collapsing the input rectangle
         defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
-        while defects:
-            # Go up, and try to find a place
-            y = min(defect.y + defect.height for defect in defects)
 
-            # If there are not enough space upwards
-            if y + length > self.y + self.height:
-                y = 0
+        if is_vertical: # Start to go up first
+            while defects:
+                # Go up, and try to find a place
+                y = min(defect.y + defect.height for defect in defects)
+
+                # If there are not enough space upwards
+                if y + length > self.y + self.height:
+                    # Go down, and find the leftmost defect's end
+                    y = 0
+                    defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
+                    x = min(defect.x + defect.width for defect in defects)
+
+                # Find collapsing defect in the new area
                 defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
+            
+            # If there are not enough space rightwards
+            if x + width > self.x + self.width:
+                # Return None
+                return -1, -1
+        
+        else: # Start to go right first
+            while defects:
+                # Go right, and try to find a place
                 x = min(defect.x + defect.width for defect in defects)
 
-            defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
-        
-        # If there are not enough space rightwards
-        if x + width > self.x + self.width:
-            # Return None
-            return -1, -1
-        # Else return the coordinates
+                # If there are not enough space rightwards
+                if x + width > self.x + self.width:
+                    # Go left, and find the lowest defect's end
+                    x = 0
+                    defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
+                    y = min(defect.y + defect.height for defect in defects)
+
+                defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
+            
+            # If there are not enough space upwards
+            if y + length > self.y + self.height:
+                # Return None
+                return -1, -1
+            
+        # If we found a place, return it's coordinates
         return x, y
+
 
 @dataclass
 class Node:
@@ -276,6 +317,7 @@ class Node:
     residual: Residual
     parent: Optional['Node'] = None
     children: List['Node'] = field(default_factory=list)
+    been_4_cut: bool = False
     
     # Class-level attribute to automatically assign IDs
     _id_counter: int = field(init=False, repr=False, default=0)
