@@ -1,9 +1,6 @@
-import pandas as pd
 from read_input import read_instance
-from pprint import pprint
 from classes import Bin, Item, Stack, Node, Residual, Place
-from typing import List, Tuple, Optional
-from os import path
+from typing import List, Tuple
 
 # TODO dont cut defect
 # TODO waste minimum size 20*20
@@ -19,6 +16,7 @@ def first_fit_solve(id: str = "A1"):
     Solves the glass-cutting problem with a first fit approach,
     without rotating the items.
     """
+    print("Started first fit solve algorithm")
     # trees containts the root nodes of the output
     trees: list[Node] = []  
     
@@ -34,7 +32,7 @@ def first_fit_solve(id: str = "A1"):
         current_stack: Stack = batch.stacks.pop(0)
         
         # While there are items in this stack
-        while current_stack:
+        while current_stack.sequence:
             # Remove first item from current_stack
             current_item: Item = current_stack.sequence.pop(0)
 
@@ -42,9 +40,15 @@ def first_fit_solve(id: str = "A1"):
             while not success:
                 current_node = start_new_bin(bins, trees)
                 current_node, success = place_item(current_item, current_node)
+    
+    # If the last node is not the root, it should be waste
+    if current_node != trees[-1]:
+        make_node(current_node).type = -1
 
     # The last waste is a residual
-    if trees[-1].children[-1].type == -1: trees[-1].children[-1].type = -3
+    make_node(trees[-1]).type = -3
+
+    # Return solution
     return trees
 
 
@@ -56,7 +60,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
     """
     
     # Find place starting from bottom left corner
-    x, y = current_node.residual.find_place(current_item.width, current_item.length, current_node.cut%2==0) # TODO
+    x, y = current_node.residual.find_place(current_item.width, current_item.length, current_node.cut%2==0)
     
     # If there is no space
     if x == -1:
@@ -70,56 +74,33 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
 
     # If this is a 4-cut level, then do trimming
     if current_node.cut >= 4:
-        
-        # Trimming: With 1 cut (vertical or horizontal) create 2 part: 1 item and 1 waste (or 2 items) 
-        place = where_can_i_place(current_node, current_item)
-        if place == Place.LEFT: 
-            # do vertical cut, and left side is suitable
-            vertical_cut(current_node, x + current_item.width).type = current_item.id
-            make_node(current_node).type = -1
-        elif place == Place.RIGHT: 
-            # do vertical cut, and right side is suitable
-            vertical_cut(current_node, x).type = -1
-            make_node(current_node).type = current_item.id
-        elif place == Place.DOWN: 
-            # do horizontal cut, and down is suitable
-            horizontal_cut(current_node, y + current_item.width).type = current_item.id
-            make_node(current_node).type = -1
-        elif place == Place.UP : 
-            # do horizontal cut, and up is suitable
-            horizontal_cut(current_node, x).type = -1
-            make_node(current_node).type = current_item.id
-        else: 
-            # Cannot place item here with a 4-cut
-            make_node(current_node).type = -1
-
-        if current_node.parent != None:
-            current_node = current_node.parent
+        return trim(current_node, current_item)
     
+    # Normal cuts
     if current_node.cut %2 == 0:  # Vertical cut
         if x != current_node.residual.x: # if there is a waste
             waste_node = vertical_cut(current_node, x)
             waste_node.type = -1
 
-        children_node: Node = vertical_cut(current_node, x + current_item.width)
-        if children_node.height == current_item.length:
-            children_node.type = current_item.id
+        child_node = vertical_cut(current_node, x + current_item.width)
+        if child_node.residual.height == current_item.length:
+            child_node.type = current_item.id
             return (current_node, True)
         
     else:  # Horizontal cut
         if y != current_node.residual.y: # if there is a waste
-            waste_node = horizontal_cut(current_node, x)
+            waste_node = horizontal_cut(current_node, y)
             waste_node.type = -1
 
-        children_node: Node = horizontal_cut(current_node, y + current_item.length)
-        if children_node.width == current_item.width:
-            children_node.type = current_item.id
+        child_node = horizontal_cut(current_node, y + current_item.length)
+        if child_node.residual.width == current_item.width:
+            child_node.type = current_item.id
             return (current_node, True)
        
-    return place_item(current_item, children_node)
+    return place_item(current_item, child_node)
     
 
-def start_new_bin(bins: list[Bin], trees) -> Node:
+def start_new_bin(bins: list[Bin], trees: List[Node]) -> Node:
     """
     Creates a new root node from the first bin in `bins` and adds it to `trees`.
     
@@ -134,7 +115,7 @@ def start_new_bin(bins: list[Bin], trees) -> Node:
         Node: The created root node representing the bin.
     """
     # Take out the first bin from bins
-    bin: Bin = bins.pop(0)
+    bin = bins.pop(0)
 
     # Convert it into a root
     root = Node(
@@ -153,17 +134,17 @@ def start_new_bin(bins: list[Bin], trees) -> Node:
     return root
 
 
-def vertical_cut(current_node: Node, width: int) -> Node:
+def vertical_cut(current_node: Node, x: int) -> Node:
     """
     Modifies the original node by creating a vertical cut and returning 
     a new node with the right parameters.
 
     Parameters:
         original (Node): The original node to be modified.
-        width (int): The width of the new left-side node to be cut.
+        x (int): The coordinate to cut at.
 
     Returns:
-        children_node (Node): A new node object representing the left portion of the 
+        child_node (Node): A new node object representing the left portion of the 
         original residual after the cut.
     """
     # Construct the new Node
@@ -171,7 +152,7 @@ def vertical_cut(current_node: Node, width: int) -> Node:
         plate_id = current_node.plate_id,
         x = current_node.residual.x,
         y = current_node.residual.y,
-        width = width,
+        width = x - current_node.residual.x,
         height = current_node.residual.height,
         type = -2, 
         cut = current_node.cut + 1,
@@ -179,10 +160,10 @@ def vertical_cut(current_node: Node, width: int) -> Node:
         residual = Residual(
             x = current_node.residual.x,
             y = current_node.residual.y,
-            width = width,
+            width = x - current_node.residual.x,
             height = current_node.residual.height,
             defects = current_node.residual.defects_in(
-                current_node.residual.x, current_node.residual.x + width,
+                current_node.residual.x, x,
                 current_node.residual.y, current_node.residual.y + current_node.residual.height
             ) 
         )
@@ -190,8 +171,8 @@ def vertical_cut(current_node: Node, width: int) -> Node:
     current_node.children.append(child_node)
 
     # Update the current_node residual
-    current_node.residual.x += width
-    current_node.residual.width -= width
+    current_node.residual.x = x
+    current_node.residual.width -= child_node.width
     current_node.residual.defects = current_node.residual.defects_in(
         current_node.residual.x, current_node.residual.x + current_node.residual.width,
         current_node.residual.y, current_node.residual.y + current_node.residual.height
@@ -200,17 +181,17 @@ def vertical_cut(current_node: Node, width: int) -> Node:
     return child_node
 
 
-def horizontal_cut(current_node: Node, height: int) -> Node:
+def horizontal_cut(current_node: Node, y: int) -> Node:
     """
     Modifies the original node by creating a horizontal cut and returning 
     a new node with the appropriate parameters.
 
     Parameters:
         current_node (Node): The original node to be modified.
-        height (int): The height of the new top-side node to be cut.
+        y (int): The coordinate to cut at.
 
     Returns:
-        children_node (Node): A new node object representing the top portion of the 
+        child_node (Node): A new node object representing the top portion of the 
         original residual after the cut.
     """
     # Construct the new Node
@@ -219,7 +200,7 @@ def horizontal_cut(current_node: Node, height: int) -> Node:
         x = current_node.residual.x,
         y = current_node.residual.y,
         width = current_node.residual.width,
-        height = height,
+        height = y - current_node.residual.y,
         type = -2, 
         cut = current_node.cut + 1,
         parent = current_node,
@@ -227,18 +208,18 @@ def horizontal_cut(current_node: Node, height: int) -> Node:
             x = current_node.residual.x,
             y = current_node.residual.y,
             width = current_node.residual.width,
-            height = height,
+            height = y - current_node.residual.y,
             defects = current_node.residual.defects_in(
                 current_node.residual.x, current_node.residual.x + current_node.residual.width,
-                current_node.residual.y, current_node.residual.y + height
+                current_node.residual.y, y
             )
         )
     )
     current_node.children.append(child_node)
 
     # Update the current_node residual
-    current_node.residual.y += height
-    current_node.residual.height -= height
+    current_node.residual.y = y
+    current_node.residual.height -= child_node.height
     current_node.residual.defects = current_node.residual.defects_in(
         current_node.residual.x, current_node.residual.x + current_node.residual.width,
         current_node.residual.y, current_node.residual.y + current_node.residual.height
@@ -264,7 +245,7 @@ def where_can_i_place(node: Node, item: Item) -> Place:
             - Place.NONE: Indicates that the item cannot be placed.
     """
     
-    if node.height == item.length:
+    if node.residual.height == item.length:
         # Can I place it left?
         if (not node.residual.has_defect_in(
             node.residual.x, node.residual.y,
@@ -277,7 +258,7 @@ def where_can_i_place(node: Node, item: Item) -> Place:
             node.residual.x + node.residual.width, node.residual.y + node.residual.height)):
             return Place.RIGHT
 
-    if node.width == item.width:
+    if node.residual.width == item.width:
         # Can I place it down?
         if (not node.residual.has_defect_in(
             node.residual.x, node.residual.y,
@@ -308,8 +289,8 @@ def make_node(current_node: Node) -> Node:
     """
     # Make waste node
     child_node = Node(
-        plate_id=current_node.id,
-        x = current_node.residual.width,
+        plate_id = current_node.plate_id,
+        x = current_node.residual.x,
         y = current_node.residual.y,
         width = current_node.residual.width,
         height = current_node.residual.height,
@@ -335,48 +316,34 @@ def make_node(current_node: Node) -> Node:
 
     return child_node
 
-
-def convert_to_solution_file(trees, id):
-    """
-        Convert a solution of trees into the solution file format. 
-    """
-    def traverse_tree(root: Node):
-    # Store the result in a list of dictionaries
-        result = []
-
-        def traverse(node: Node, parent_id: Optional[int]):
-            # Collect node attributes into a dictionary
-            data = {
-                "PLATE_ID": node.plate_id,
-                "NODE_ID": node.id,
-                "X": node.x,
-                "Y": node.y,
-                "WIDTH": node.width,
-                "HEIGHT": node.height,
-                "TYPE": node.type,
-                "CUT": node.cut,
-                "PARENT": parent_id if parent_id is not None else -1
-            }
-            # Append the data to the result list
-            result.append(data)
-            
-            # Recursively traverse children
-            for child in node.children:
-                traverse(child, node.id)
-        
-        # Start traversal with root node
-        traverse(root, None)
-        
-        return result
+def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
     
-    # Collecting data from all root nodes
-    all_nodes_data = []
-    for root in trees:
-        all_nodes_data.extend(traverse_tree(root))
-
-    # Convert collected data to DataFrame and save to CSV
-    df = pd.DataFrame(all_nodes_data)
-    csv_file_path = path.join('solutions', f"{id}_solution.csv")
-    df.to_csv(csv_file_path, index=False)
-
-    pass
+    # Trimming: With 1 cut (vertical or horizontal) create 2 part: 1 item and 1 waste (or 2 items) 
+    place = where_can_i_place(current_node, current_item)
+    if place == Place.LEFT: 
+        # do vertical cut, and left side is suitable
+        vertical_cut(current_node, current_node.x + current_item.width).type = current_item.id
+        make_node(current_node).type = -1
+    elif place == Place.RIGHT: 
+        # do vertical cut, and right side is suitable
+        vertical_cut(current_node, current_node.residual.x + current_node.residual.width - current_item.width).type = -1
+        make_node(current_node).type = current_item.id
+    elif place == Place.DOWN: 
+        # do horizontal cut, and down is suitable
+        horizontal_cut(current_node, current_node.y + current_item.length).type = current_item.id
+        make_node(current_node).type = -1
+    elif place == Place.UP : 
+        # do horizontal cut, and up is suitable
+        horizontal_cut(current_node, current_node.y + current_node.height - current_item.length).type = -1
+        make_node(current_node).type = current_item.id
+    else: 
+        # Cannot place item here with a 4-cut
+        make_node(current_node).type = -1
+        if current_node.parent is not None:
+            return current_node.parent, False
+    if current_node.parent is not None:
+        return current_node.parent, True
+    
+    # only for typehinting... (never happens.... or at least it shouldn't)
+    return current_node, False
+    

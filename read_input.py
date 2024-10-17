@@ -68,7 +68,7 @@ def read_batch(file_path: str) -> Batch:
         stacks_dict[stack_id].append(item)
 
     # Convert stacks to a list of Stack objects
-    stacks = [Stack(id=stack_id, sequence=tuple(items)) for stack_id, items in stacks_dict.items()]
+    stacks = [Stack(id=stack_id, sequence=list(items)) for stack_id, items in stacks_dict.items()]
 
     # Create a Batch object
     batch = Batch(stacks=stacks)
@@ -91,7 +91,7 @@ def read_defects(file_path: str) -> list[Bin]:
     for _, row in df.iterrows():
         # Create a Defect object for each row
         defect = Defect(
-            id=row['DEFECT_ID'],
+            id=int(row['DEFECT_ID']),
             x=int(float(row['X'])),
             y=int(float(row['Y'])),
             width=int(float(row['WIDTH'])),
@@ -99,7 +99,7 @@ def read_defects(file_path: str) -> list[Bin]:
         )
         
         # Get the bin (plate) ID
-        bin_id = row['PLATE_ID']
+        bin_id = int(row['PLATE_ID'])
         
         # Group defects by bin (plate)
         if bin_id not in bins_dict:

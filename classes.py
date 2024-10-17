@@ -237,6 +237,8 @@ class Residual:
         # Start at the bottom left
         x, y = self.x, self.y
 
+        if self.width < width or self.height < length: return -1, -1
+
         # If there are defects collapsing the input rectangle
         defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
 
@@ -248,7 +250,7 @@ class Residual:
                 # If there are not enough space upwards
                 if y + length > self.y + self.height:
                     # Go down, and find the leftmost defect's end
-                    y = 0
+                    y = self.y
                     defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
                     x = min(defect.x + defect.width for defect in defects)
 
@@ -268,7 +270,7 @@ class Residual:
                 # If there are not enough space rightwards
                 if x + width > self.x + self.width:
                     # Go left, and find the lowest defect's end
-                    x = 0
+                    x = self.x
                     defects = self.defects_in(x_low = x, x_high = x+width, y_low = y, y_high = y+length)
                     y = min(defect.y + defect.height for defect in defects)
 
