@@ -85,7 +85,7 @@ def read_defects(file_path: str) -> list[Bin]:
     df = pd.read_csv(file_path, sep=';')
 
     # Dictionary to group defects by Bin (plate)
-    bins_dict = {}
+    bins_dict = {key: [] for key in range(100)}
 
     # Iterate over each row in the dataframe
     for _, row in df.iterrows():

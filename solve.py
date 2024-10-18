@@ -1,6 +1,7 @@
 from read_input import read_instance
 from classes import Bin, Item, Stack, Node, Residual, Place
 from typing import List, Tuple
+from pprint import pprint
 
 # TODO dont cut defect
 # TODO waste minimum size 20*20
@@ -22,6 +23,7 @@ def first_fit_solve(id: str = "A1"):
     
     # Read input
     bins, batch = read_instance(id)
+    #pprint(bins[:7])
 
     # Construct the root and the residual
     current_node = start_new_bin(bins, trees)
