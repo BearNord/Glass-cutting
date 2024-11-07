@@ -97,10 +97,8 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
 
     match current_node.cut:
         case 0:  #  1-cut
-
             # if there is a waste
             if x != current_node.residual.x:
-
                 cut_place = current_node.residual.x
                 # if the waste is too small
                 if x - current_node.residual.x < MIN_1_CUT:
@@ -108,16 +106,21 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                         current_node, current_node.residual.x + MIN_1_CUT
                     )
 
+                # If the remaining residual would be too small, go for 2-cut
+                if current_node.residual.width - cut_place < MIN_1_CUT:
+                    current_node = make_node(current_node)
+                    return place_item(current_item, current_node)
+
+                # Cut a big enough column, and solve or the remaining part
                 waste_node = vertical_cut(current_node, cut_place)
                 waste_node.type = -1
-                # return place_item(current_item, current_node)
+                return place_item(current_item, current_node)
 
             cut_place = x + current_item.width
-
             # If the cut would be smaller than the minimum
             if cut_place - current_node.residual.x < MIN_1_CUT:
 
-                # Check if there are defects at the minimal distance
+                # Find the smallest x were we can cut
                 cut_place = find_left_to_x(
                     current_node, current_node.residual.x + MIN_1_CUT
                 )
@@ -437,7 +440,7 @@ def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
 
 
 def find_left_to_x(current_node: Node, cut_place: int):
-    """ "
+    """
     Finds the first place on the x-axis where we can cut (not cutting through a defect).
     """
     # Check if there are defects in our cut
