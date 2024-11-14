@@ -27,7 +27,7 @@ def first_fit_solve(id: str = "A1"):
     Solves the glass-cutting problem with a first fit approach,
     without rotating the items.
     """
-    print("Started first fit solve algorithm")
+    print(f"Started first fit solve algorithm for {id}")
     # trees containts the root nodes of the output
     trees: list[Node] = []
 
@@ -66,6 +66,9 @@ def first_fit_solve(id: str = "A1"):
     make_node(trees[-1]).type = -3
 
     # Return solution
+
+    print(f"\tFinished first fit solve algorithm for {id}")
+
     return trees
 
 
@@ -83,6 +86,14 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
 
     # If there is no space
     if x == -1:
+        # If there is no residual left, we don't need to make a waste from it
+        if current_node.residual.width == 0 or current_node.residual.height == 0:
+            # If this is the root
+            if current_node.parent is None:
+                return current_node, False
+            else:
+                return place_item(current_item, current_node.parent)
+
         # Make a waste node from its residual
         make_node(current_node).type = -1
         # If this is the root
@@ -93,17 +104,21 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
 
     match current_node.cut:
         case 0:  #  1-cut (vertical)
-            # If there is a waste
+
+            # If there is a waste to the left
             if x != current_node.residual.x:
                 cut_place = x
-                # If the waste is too small
-                if x - current_node.residual.x < MIN_WASTE:
+                # If the cut would be too small
+                if x - current_node.residual.x < MIN_1_CUT:
                     cut_place = find_right_to_x(
-                        current_node, current_node.residual.x + MIN_WASTE
+                        current_node, current_node.residual.x + MIN_1_CUT
                     )
 
                 # If the remaining residual would be too small, go for 2-cut
-                if current_node.residual.width - cut_place < MIN_WASTE:
+                if (
+                    current_node.residual.x + current_node.residual.width - cut_place
+                    < MIN_WASTE
+                ):
                     child_node = make_node(current_node)
                     return place_item(current_item, child_node)
 
@@ -118,7 +133,9 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
             if cut_place - current_node.residual.x < MIN_1_CUT:
                 # Find the smallest x were we can cut
                 cut_place = find_right_to_x(
-                    current_node, current_node.residual.x + MIN_1_CUT
+                    current_node,
+                    current_node.residual.x
+                    + MIN_1_CUT,  # TODO? + MIN_WASTE (csak optimalizáció lehetne)
                 )
 
             # If the remaining residual would be too small
@@ -130,22 +147,33 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 return place_item(current_item, child_node)
 
             child_node = vertical_cut(current_node, cut_place)
-            if child_node.residual.height == current_item.length:
+
+            # If the cut was perfect
+            if (
+                child_node.residual.height == current_item.length
+                and child_node.residual.width == current_item.width
+            ):
                 child_node.type = current_item.id
                 return (current_node, True)
 
+            return place_item(current_item, child_node)
+
         case 1:  #  2-cut (horizontal)
+
             # If there is a waste
             if y != current_node.residual.y:
                 cut_place = y
-                # If the waste is too small
-                if y - current_node.residual.y < MIN_WASTE:
+                # If the cut would be too small
+                if y - current_node.residual.y < MIN_2_CUT:
                     cut_place = find_up_to_y(
-                        current_node, current_node.residual.y + MIN_WASTE
+                        current_node, current_node.residual.y + MIN_2_CUT
                     )
 
                 # If the remaining residual would be too small, go to 3-cut
-                if current_node.residual.height - cut_place < MIN_WASTE:
+                if (
+                    current_node.residual.y + current_node.residual.height - cut_place
+                    < MIN_WASTE
+                ):
                     child_node = make_node(current_node)
                     return place_item(current_item, child_node)
 
@@ -163,7 +191,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                     current_node, current_node.residual.x + MIN_2_CUT
                 )
 
-            # If the remaining residual would be too small
+            # If the remaining residual would be too small (in height)
             if (
                 current_node.residual.y + current_node.residual.height - cut_place
                 < MIN_WASTE
@@ -172,32 +200,93 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 return place_item(current_item, child_node)
 
             child_node = horizontal_cut(current_node, cut_place)
-            if child_node.residual.width == current_item.width:
+
+            # If the cut was perfect
+            if (
+                child_node.residual.width == current_item.width
+                and child_node.residual.height == current_item.length
+            ):
                 child_node.type = current_item.id
                 return (current_node, True)
 
+            return place_item(current_item, child_node)
+
         case 2:  # 3-cut (vertical)
 
-            # If there is a waste
+            # If there is a waste at left-side
             if x != current_node.residual.x:
                 cut_place = x
-                # If the waste is too small
+                # If the waste would be too small
                 if x - current_node.residual.x < MIN_WASTE:
                     cut_place = find_right_to_x(
                         current_node, current_node.residual.x + MIN_WASTE
                     )
 
-                # If the remaining residual would be too small, go for trimming
-                if current_node.residual.width - cut_place < MIN_WASTE:
-                    child_node = make_node(current_node)
-                    return place_item(current_item, child_node)
+                if (
+                    current_item.length  # If the size is not perfect
+                    != current_node.residual.x + current_node.residual.width - cut_place
+                    < MIN_WASTE  # and the waste would be too small
+                ):
+                    # This is a waste
+                    make_node(current_node).type = -1
+                    if current_node.parent is not None:  # Only for typehinting
+                        return place_item(current_item, current_node.parent)
 
                 # Cut a big enough column, and solve for the remaining part
-                waste_node = vertical_cut(current_node, cut_place)
-                waste_node.type = -1
+                waste_node = vertical_cut(current_node, cut_place).type = -1
                 return place_item(current_item, current_node)
 
+            # CÉL: pontosan levágjuk az itemet (ami lehet hogy eleve pontosan érkezik)
+
             cut_place = find_right_to_x(current_node, x + current_item.width)
+
+            # If no vertical cut needed
+            if cut_place == current_node.residual.x + current_node.residual.width:
+                # Do 4-cut
+                child_node = make_node(current_node)
+                return place_item(current_item, child_node)
+
+            # If the width is perfect
+            if cut_place == x + current_item.width:
+                # If the remaining residual would be too small
+                if (
+                    current_node.residual.x + current_node.residual.width - cut_place
+                    < MIN_WASTE
+                ):
+                    # this is a waste
+                    make_node(current_node).type = -1
+                    if current_node.parent is not None:  # Only for typehinting
+                        return place_item(current_item, current_node.parent)
+
+            else:  # cut was not perfect -> cut a waste column from the left side
+                cut_place = find_right_to_x(current_node, x + MIN_WASTE)
+
+                # ------ új kód --------
+                # Check for valid cut
+                if (
+                    # If after cutting the left part off, the right part is correctly sized
+                    current_node.residual.x + current_node.residual.width - cut_place
+                    == current_item.width
+                    # Or if there is enough for waste after cutting the left part
+                    or current_node.residual.x + current_node.residual.width - cut_place
+                    >= MIN_WASTE
+                ):
+                    # Cut off the left (waste) part
+                    vertical_cut(current_node, cut_place).type = -1
+
+                    # Try to place the item in the remaining part
+                    return place_item(current_item, current_node)
+
+                else:  # there would not be enough space on the right part
+                    # This is a waste
+                    make_node(current_node).type = -1
+                    if current_node.parent is not None:  # Only for typehinting
+                        return place_item(current_item, current_node.parent)
+
+            # -----------------innen tovább soha nem fog lefutni---------------
+            if cut_place != x + current_item.width:
+                # try to cut a minimal possible are from left
+                cut_place = find_right_to_x(current_node, x + MIN_WASTE)
 
             # If the remaining residual would be too small
             if (
@@ -208,11 +297,22 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 return place_item(current_item, child_node)
 
             child_node = vertical_cut(current_node, cut_place)
-            if child_node.residual.height == current_item.length:
+
+            # If the cut was perfect
+            if (
+                child_node.residual.height == current_item.length
+                and child_node.residual.width == current_item.width
+            ):
                 child_node.type = current_item.id
                 return (current_node, True)
 
         case 3:  # Instead of 4-cut, do trimming
+
+            if current_item.length == current_node.height:
+                current_node.type = current_item.id
+                if current_node.parent is not None:  # Only for typehinting
+                    return current_node.parent, True
+
             current_node, success = trim(current_node, current_item)
             if success:
                 return current_node, success
@@ -380,25 +480,6 @@ def place_4_cut(node: Node, item: Item) -> Place:
             - Place.NONE: Indicates that the item cannot be placed.
     """
 
-    if node.residual.height == item.length:
-        # Can I place it left?
-        if not node.residual.has_defect_in(
-            node.residual.x,
-            node.residual.y,
-            node.residual.x + item.width,
-            node.residual.y + node.residual.height,
-        ):
-            return Place.LEFT
-
-        # Can I place it right?
-        elif not node.residual.has_defect_in(
-            node.residual.x + node.residual.width - item.width,
-            node.residual.y,
-            node.residual.x + node.residual.width,
-            node.residual.y + node.residual.height,
-        ):
-            return Place.RIGHT
-
     if node.residual.width == item.width:
         # Can I place it down?
         if not node.residual.has_defect_in(
@@ -465,57 +546,49 @@ def make_node(current_node: Node) -> Node:
 
 
 def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
+    """
+    Trims the given node by specified dimensions and returns a new trimmed node.
 
+    Parameters:
+        node (Node): The original node to be trimmed, representing a rectangular area.
+        trim_x (int): The amount to reduce the node's width.
+        trim_y (int): The amount to reduce the node's height.
+
+    Returns:
+        current_node (Node): A new `Node` instance representing the trimmed area of the original node.
+    """
     # Trimming: With 1 cut (vertical or horizontal) create 2 part: 1 item and 1 waste (or 2 items)
     place = place_4_cut(current_node, current_item)
+    # if current_item.id == 70:
+    #     pass
 
-    if place in (Place.LEFT, Place.RIGHT):
+    if place in (Place.UP, Place.DOWN):
         # If not enough waste after cut
-        if (
-            current_node.residual.x + current_node.residual.width - current_item.width
-            < MIN_WASTE
-        ):
-            make_node(current_node).type = -1
-            return current_node, False
-    elif place in (Place.UP, Place.DOWN):
-        # If not enough waste after cut
-        if (
-            current_node.residual.y + current_node.residual.height - current_item.length
-            < MIN_WASTE
-        ):
+        if current_node.residual.height - current_item.length < MIN_WASTE:
             make_node(current_node).type = -1
             return current_node, False
 
-    if place == Place.LEFT:
-        # do vertical cut, and left side is suitable
-        vertical_cut(current_node, current_node.x + current_item.width).type = (
-            current_item.id
-        )
-        make_node(current_node).type = -1
-    elif place == Place.RIGHT:
-        # do vertical cut, and right side is suitable
-        vertical_cut(
-            current_node,
-            current_node.residual.x + current_node.residual.width - current_item.width,
-        ).type = -1
-        make_node(current_node).type = current_item.id
-    elif place == Place.DOWN:
-        # do horizontal cut, and down is suitable
-        horizontal_cut(current_node, current_node.y + current_item.length).type = (
-            current_item.id
-        )
-        make_node(current_node).type = -1
-    elif place == Place.UP:
-        # do horizontal cut, and up is suitable
-        horizontal_cut(
-            current_node, current_node.y + current_node.height - current_item.length
-        ).type = -1
-        make_node(current_node).type = current_item.id
-    else:
-        # Cannot place item here with a 4-cut
-        make_node(current_node).type = -1
-        if current_node.parent is not None:
-            return current_node.parent, False
+    match place:
+        case Place.DOWN:
+            # do horizontal cut, and down is suitable
+            horizontal_cut(current_node, current_node.y + current_item.length).type = (
+                current_item.id
+            )
+            make_node(current_node).type = -1
+
+        case Place.UP:
+            # do horizontal cut, and up is suitable
+            horizontal_cut(
+                current_node, current_node.y + current_node.height - current_item.length
+            ).type = -1
+            make_node(current_node).type = current_item.id
+
+        case Place.NONE:
+            # Cannot place item here with a 4-cut
+            make_node(current_node).type = -1
+            if current_node.parent is not None:
+                return current_node.parent, False
+
     if current_node.parent is not None:
         return current_node.parent, True
 
@@ -525,7 +598,14 @@ def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
 
 def find_right_to_x(current_node: Node, cut_place: int):
     """
-    Finds the first place on the x-axis where we can cut (not cutting through a defect).
+    Finds the first valid x-coordinate for a cut in the given node's residual area, avoiding defects.
+
+    Parameters:
+        current_node (Node): The node with the residual area to evaluate for a cut.
+        cut_place (int): Initial x-coordinate for the cut attempt.
+
+    Returns:
+        cut_place (int) : The x-coordinate of the first defect-free cutting location.
     """
     # Check if there are defects in our cut
     defects = current_node.residual.defects_in(
@@ -550,7 +630,14 @@ def find_right_to_x(current_node: Node, cut_place: int):
 
 def find_up_to_y(current_node: Node, cut_place: int):
     """
-    Finds the first place on the x-axis where we can cut (not cutting through a defect).
+    Finds the first valid y-coordinate for a cut in the given node's residual area, avoiding defects.
+
+    Parameters:
+        current_node (Node): The node with the residual area to evaluate for a cut.
+        cut_place (int): Initial y-coordinate for the cut attempt.
+
+    Returns:
+        cut_place (int) : The y-coordinate of the first defect-free cutting location.
     """
     # Check if there are defects in our cut
     defects = current_node.residual.defects_in(

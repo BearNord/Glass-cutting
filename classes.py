@@ -329,3 +329,8 @@ class Node:
         # Automatically assign and increment the ID
         self.id = Node._id_counter
         Node._id_counter += 1
+
+    @classmethod
+    def reset_id_counter(cls):
+        """Reset the class-level ID counter to 0."""
+        cls._id_counter = 0

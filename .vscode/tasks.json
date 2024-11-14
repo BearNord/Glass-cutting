@@ -7,7 +7,8 @@
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
-                "${file}",
+                //"${file}",
+                "GlassDefect.cpp", "GlassItem.cpp", "GlassNode.cpp", "GlassPlate.cpp", "GlassStack.cpp", "main.cpp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe"
             ],

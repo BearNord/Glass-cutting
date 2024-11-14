@@ -3,6 +3,7 @@ from solve import first_fit_solve
 from os import path
 from typing import Optional, List
 from classes import Node
+from pprint import pprint
 
 
 def convert_to_solution_file(trees: List[Node], id="A1"):
@@ -49,16 +50,27 @@ def convert_to_solution_file(trees: List[Node], id="A1"):
     df = pd.DataFrame(all_nodes_data)
 
     # Convert 'PARENT' column to nullable integer type to handle None values without converting to float
-    df["PARENT"] = df["PARENT"].astype(
-        "Int64"
-    )  # 'Int64' with a capital 'I' is a nullable integer type
+    # 'Int64' with a capital 'I' is a nullable integer type
+    df["PARENT"] = df["PARENT"].astype("Int64")
 
     # save to CSV
     csv_file_path = path.join("solutions", f"{id}_solution.csv")
     df.to_csv(csv_file_path, sep=";", index=False)
 
 
-if __name__ == "__main__":
-    param = "A2"
+def run_all(dataset="A"):
+    for i in range(1, 21):
+        Node.reset_id_counter()
+        param = f"{dataset}{i}"
+        solution_trees = first_fit_solve(param)
+        convert_to_solution_file(solution_trees, param)
+
+
+def run_one(param="A1"):
     solution_trees = first_fit_solve(param)
     convert_to_solution_file(solution_trees, param)
+
+
+if __name__ == "__main__":
+    # run_one("A2")
+    run_all("A")
