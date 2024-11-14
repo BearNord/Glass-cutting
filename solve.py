@@ -1,4 +1,4 @@
-from read_input import read_instance
+from input_output import read_instance, convert_to_solution_file
 from classes import (
     Bin,
     Item,
@@ -11,12 +11,12 @@ from classes import (
     MIN_WASTE,
 )
 from typing import List, Tuple
-from pprint import pprint
 
 
 # TODO max distance between 1-cuts: 3500 (except residual)
 # TODO must contain at least one 1-cut
 
+# TODO merge place_4_cut and trim
 # TODO (Optional) Don't do waste cut for 1-cut
 
 log = False
@@ -33,7 +33,6 @@ def first_fit_solve(id: str = "A1"):
 
     # Read input
     bins, batch = read_instance(id)
-    # pprint(bins[:7])
 
     # Construct the root and the residual
     current_node = start_new_bin(bins, trees)
@@ -52,6 +51,10 @@ def first_fit_solve(id: str = "A1"):
                 print(
                     f"Trying to place item: {current_item.id} into bin {current_node.plate_id}"
                 )
+
+            if current_item.id == 114:
+                print("item 114 is coming")
+
             current_node, success = place_item(current_item, current_node)
             while not success:
                 current_node = start_new_bin(bins, trees)
@@ -463,45 +466,6 @@ def horizontal_cut(current_node: Node, y: int) -> Node:
     return child_node
 
 
-def place_4_cut(node: Node, item: Item) -> Place:
-    """
-    Decides where an item can be placed for a 4-cut.
-
-    Parameters:
-        - node (Node): The node where there is a 4-cut.
-        - item (Item): The item to place.
-
-    Returns:
-        - Place: An enum value indicating the suitable placement direction:
-            - Place.LEFT: Indicates a vertical cut; left is suitable for the item.
-            - Place.RIGHT: Indicates a vertical cut; right is suitable for the item.
-            - Place.DOWN: Indicates a horizontal cut; down is suitable for the item.
-            - Place.UP: Indicates a horizontal cut; up is suitable for the item.
-            - Place.NONE: Indicates that the item cannot be placed.
-    """
-
-    if node.residual.width == item.width:
-        # Can I place it down?
-        if not node.residual.has_defect_in(
-            node.residual.x,
-            node.residual.y,
-            node.residual.x + node.residual.width,
-            node.residual.y + item.length,
-        ):
-            return Place.DOWN
-
-        # Can I place it up?
-        elif not node.residual.has_defect_in(
-            node.residual.x,
-            node.residual.y + node.residual.height - item.length,
-            node.residual.x + node.residual.width,
-            node.residual.y + node.residual.height,
-        ):
-            return Place.UP
-
-    return Place.NONE
-
-
 def make_node(current_node: Node) -> Node:
     """
     Converts the remaining residual of the current node into a node.
@@ -545,6 +509,43 @@ def make_node(current_node: Node) -> Node:
     return child_node
 
 
+def place_4_cut(node: Node, item: Item) -> Place:
+    """
+    Decides where an item can be placed for a 4-cut.
+
+    Parameters:
+        - node (Node): The node where there is a 4-cut.
+        - item (Item): The item to place.
+
+    Returns:
+        - Place: An enum value indicating the suitable placement direction:
+            - Place.DOWN: Indicates a horizontal cut; down is suitable for the item.
+            - Place.UP: Indicates a horizontal cut; up is suitable for the item.
+            - Place.NONE: Indicates that the item cannot be placed.
+    """
+
+    if node.residual.width == item.width:
+        # Can I place it down?
+        if not node.residual.has_defect_in(
+            node.residual.x,
+            node.residual.y,
+            node.residual.x + node.residual.width,
+            node.residual.y + item.length,
+        ):
+            return Place.DOWN
+
+        # Can I place it up?
+        elif not node.residual.has_defect_in(
+            node.residual.x,
+            node.residual.y + node.residual.height - item.length,
+            node.residual.x + node.residual.width,
+            node.residual.y + node.residual.height,
+        ):
+            return Place.UP
+
+    return Place.NONE
+
+
 def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
     """
     Trims the given node by specified dimensions and returns a new trimmed node.
@@ -557,12 +558,10 @@ def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
     Returns:
         current_node (Node): A new `Node` instance representing the trimmed area of the original node.
     """
-    # Trimming: With 1 cut (vertical or horizontal) create 2 part: 1 item and 1 waste (or 2 items)
+    # Trimming: With 1 cut (horizontal) create 2 part: 1 item and 1 waste (or 2 items)
     place = place_4_cut(current_node, current_item)
-    # if current_item.id == 70:
-    #     pass
 
-    if place in (Place.UP, Place.DOWN):
+    if place != Place.NONE:
         # If not enough waste after cut
         if current_node.residual.height - current_item.length < MIN_WASTE:
             make_node(current_node).type = -1
@@ -625,6 +624,13 @@ def find_right_to_x(current_node: Node, cut_place: int):
             current_node.residual.y + current_node.residual.height,
         )
 
+        # Filter out defects that start or end at cut_place
+        defects = [
+            defect
+            for defect in defects
+            if not (defect.x == cut_place or defect.x + defect.width == cut_place)
+        ]
+
     return cut_place
 
 
@@ -656,5 +662,12 @@ def find_up_to_y(current_node: Node, cut_place: int):
             cut_place - 1,
             cut_place + 1,
         )
+
+        # Filter out defects that start or end at cut_place
+        defects = [
+            defect
+            for defect in defects
+            if not (defect.y == cut_place or defect.y + defect.height == cut_place)
+        ]
 
     return cut_place

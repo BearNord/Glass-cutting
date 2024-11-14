@@ -33,8 +33,6 @@ class Place(Enum):
     """
 
     NONE = 0
-    LEFT = auto()
-    RIGHT = auto()
     DOWN = auto()
     UP = auto()
 
@@ -199,11 +197,12 @@ class Residual:
                     x_low < defect.x < x_high
                     or x_low < defect.x + defect.width < x_high
                     or (x_low >= defect.x and x_high <= defect.x + defect.width)
-                )  # and has defect in x values
+                )  # and has defect between y values
                 and (
                     y_low < defect.y < y_high
                     or y_low < defect.y + defect.height < y_high
                     or (y_low >= defect.y and y_high <= defect.y + defect.height)
+                    or (y_low > defect.y and y_high < defect.y + defect.height)
                 )
             ):
                 defects.append(defect)

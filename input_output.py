@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-from classes import Bin, Batch, Item, Stack, Defect, WIDTH_PLATES, HEIGHT_PLATES
+from classes import Bin, Batch, Item, Stack, Defect, Node, WIDTH_PLATES, HEIGHT_PLATES
+from typing import Optional, List
 
 
 def read_instance(id: str = "A1") -> tuple[list[Bin], Batch]:
@@ -118,3 +119,55 @@ def read_defects(file_path: str) -> list[Bin]:
 
     # Now 'bins' contains a list of Bin objects with associated defects
     return bins
+
+
+def convert_to_solution_file(trees: List[Node], id="A1"):
+    """
+    Convert a solution of trees into the solution file format.
+    Credit: ChatGPT
+    """
+
+    def traverse_tree(root: Node):
+        # Store the result in a list of dictionaries
+        result = []
+
+        def traverse(node: Node, parent_id: Optional[int]):
+            # Collect node attributes into a dictionary
+            data = {
+                "PLATE_ID": node.plate_id,
+                "NODE_ID": node.id,
+                "X": node.x,
+                "Y": node.y,
+                "WIDTH": node.width,
+                "HEIGHT": node.height,
+                "TYPE": node.type,
+                "CUT": node.cut,
+                "PARENT": parent_id,
+            }
+            # Append the data to the result list
+            result.append(data)
+
+            # Recursively traverse children
+            for child in node.children:
+                traverse(child, node.id)
+
+        # Start traversal with root node
+        traverse(root, None)
+
+        return result
+
+    # Collecting data from all root nodes
+    all_nodes_data = []
+    for root in trees:
+        all_nodes_data.extend(traverse_tree(root))
+
+    # Convert collected data to DataFrame
+    df = pd.DataFrame(all_nodes_data)
+
+    # Convert 'PARENT' column to nullable integer type to handle None values without converting to float
+    # 'Int64' with a capital 'I' is a nullable integer type
+    df["PARENT"] = df["PARENT"].astype("Int64")
+
+    # save to CSV
+    csv_file_path = os.path.join("solutions", f"{id}_solution.csv")
+    df.to_csv(csv_file_path, sep=";", index=False)
