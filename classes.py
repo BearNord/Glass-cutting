@@ -90,6 +90,14 @@ class Item:
     width: int
     length: int
 
+    def rotate(self):
+        """
+        Rotates the item 90 degrees.
+        """
+        width = self.width 
+        self.width = self.length
+        self.length = width
+
 
 @dataclass
 class Stack:

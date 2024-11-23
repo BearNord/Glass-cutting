@@ -21,6 +21,59 @@ from typing import List, Tuple
 
 log = False
 
+def first_fit_with_rotate(id: str = "A1"):
+    """
+    Solves the glass-cutting problem with a first fit approach,
+    with occasionally rotating the items.
+    """
+    #TODO doesn't rotate yet, bbut function is there
+    print(f"Started first fit solve algorithm for {id}")
+    # trees containts the root nodes of the output
+    trees: list[Node] = []
+
+    # Read input
+    bins, batch = read_instance(id)
+
+    # Construct the root and the residual
+    current_node = start_new_bin(bins, trees)
+
+    # While there are items to cut
+    while batch.stacks:
+        # Take out the first stack from stacks
+        current_stack: Stack = batch.stacks.pop(0)
+
+        # While there are items in this stack
+        while current_stack.sequence:
+            # Remove first item from current_stack
+            current_item: Item = current_stack.sequence.pop(0)
+
+            if log == True:
+                print(
+                    f"Trying to place item: {current_item.id} into bin {current_node.plate_id}"
+                )
+
+            if current_item.id == 114:
+                print("item 114 is coming")
+
+            current_node, success = place_item(current_item, current_node)
+            while not success:
+                current_node = start_new_bin(bins, trees)
+                current_node, success = place_item(current_item, current_node)
+
+    # If the last node is not the root, all nodes to the root should be waste
+    while current_node.parent is not None:
+        make_node(current_node).type = -1
+        current_node = current_node.parent
+
+    # The last waste is a residual
+    make_node(trees[-1]).type = -3
+
+    # Return solution
+
+    print(f"\tFinished first fit solve algorithm for {id}")
+
+    return trees
+
 
 def first_fit_solve(id: str = "A1"):
     """
