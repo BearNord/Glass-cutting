@@ -11,6 +11,7 @@ from classes import (
     MIN_WASTE,
 )
 from typing import List, Tuple
+from copy import deepcopy, copy
 
 
 # TODO max distance between 1-cuts: 3500 (except residual)
@@ -19,15 +20,17 @@ from typing import List, Tuple
 # TODO merge place_4_cut and trim
 # TODO (Optional) Don't do waste cut for 1-cut
 
+# TODO rotate_item function
+
 log = False
+
 
 def first_fit_with_rotate(id: str = "A1"):
     """
     Solves the glass-cutting problem with a first fit approach,
     with occasionally rotating the items.
     """
-    #TODO doesn't rotate yet, bbut function is there
-    print(f"Started first fit solve algorithm for {id}")
+    print(f"Started first fit solve with rotation algorithm for {id}")
     # trees containts the root nodes of the output
     trees: list[Node] = []
 
@@ -47,18 +50,62 @@ def first_fit_with_rotate(id: str = "A1"):
             # Remove first item from current_stack
             current_item: Item = current_stack.sequence.pop(0)
 
-            if log == True:
-                print(
-                    f"Trying to place item: {current_item.id} into bin {current_node.plate_id}"
+            # Save current id
+            id_to_continue: int = trees[-1].last_descendant().id + 1
+
+            # Make a copy for each case, so we can try both
+            node_for_original = deepcopy(current_node)
+            node_for_rotated = deepcopy(current_node)
+
+            # Run the place_item for the original item
+            node_for_original, original_success = place_item(
+                current_item, node_for_original
+            )
+
+            # Make a rotated version of the item, and run place_item on it
+            rotated_item = copy(current_item)
+            rotated_item.rotate()
+            node_for_rotated, rotated_success = place_item(
+                rotated_item, node_for_rotated
+            )
+
+            # If none of them could be cut
+            if not original_success and not rotated_success:
+                Node.reset_id_counter(id_to_continue)
+
+                # Finish current bin
+                _, _ = place_item(current_item, current_node)
+                current_node = start_new_bin(bins, trees)
+                id_to_continue = current_node.id + 1
+
+                node_for_original = deepcopy(current_node)
+                node_for_rotated = deepcopy(current_node)
+
+                # Run the place_item for the original item
+                node_for_original, original_success = place_item(
+                    current_item, node_for_original
                 )
 
-            if current_item.id == 114:
-                print("item 114 is coming")
+                # Run place_item for the rotated item
+                node_for_rotated, rotated_success = place_item(
+                    rotated_item, node_for_rotated
+                )
 
-            current_node, success = place_item(current_item, current_node)
-            while not success:
-                current_node = start_new_bin(bins, trees)
-                current_node, success = place_item(current_item, current_node)
+            Node.reset_id_counter(id_to_continue)
+
+            # If only one could be cut
+            if original_success and not rotated_success:
+                current_node, _ = place_item(current_item, current_node)
+            elif rotated_success and not original_success:
+                current_node, _ = place_item(rotated_item, current_node)
+
+            # If both could be cut
+            elif sum_waste_area(node_for_original.get_root()) <= sum_waste_area(
+                node_for_rotated.get_root()
+            ):
+                current_node, _ = place_item(current_item, current_node)
+            else:
+                current_node, _ = place_item(rotated_item, current_node)
 
     # If the last node is not the root, all nodes to the root should be waste
     while current_node.parent is not None:
@@ -105,9 +152,6 @@ def first_fit_solve(id: str = "A1"):
                     f"Trying to place item: {current_item.id} into bin {current_node.plate_id}"
                 )
 
-            if current_item.id == 114:
-                print("item 114 is coming")
-
             current_node, success = place_item(current_item, current_node)
             while not success:
                 current_node = start_new_bin(bins, trees)
@@ -131,7 +175,7 @@ def first_fit_solve(id: str = "A1"):
 def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
     """
     Places the given item in first fitting position.
-    If it can place it, then do it, and return [current_node, True]
+    If it can place it, then do it, and return [item's parent, True]
     If can't, then return [root, False]
     """
 
@@ -314,10 +358,19 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                     if current_node.parent is not None:  # Only for typehinting
                         return place_item(current_item, current_node.parent)
 
+                child_node = vertical_cut(current_node, cut_place)
+
+                # If the cut was perfect
+                if (
+                    child_node.residual.height == current_item.length
+                    and child_node.residual.width == current_item.width
+                ):
+                    child_node.type = current_item.id
+                    return (current_node, True)
+
             else:  # cut was not perfect -> cut a waste column from the left side
                 cut_place = find_right_to_x(current_node, x + MIN_WASTE)
 
-                # ------ új kód --------
                 # Check for valid cut
                 if (
                     # If after cutting the left part off, the right part is correctly sized
@@ -338,29 +391,6 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                     make_node(current_node).type = -1
                     if current_node.parent is not None:  # Only for typehinting
                         return place_item(current_item, current_node.parent)
-
-            # -----------------innen tovább soha nem fog lefutni---------------
-            if cut_place != x + current_item.width:
-                # try to cut a minimal possible are from left
-                cut_place = find_right_to_x(current_node, x + MIN_WASTE)
-
-            # If the remaining residual would be too small
-            if (
-                current_node.residual.x + current_node.residual.width - cut_place
-                < MIN_WASTE
-            ):
-                child_node = make_node(current_node)
-                return place_item(current_item, child_node)
-
-            child_node = vertical_cut(current_node, cut_place)
-
-            # If the cut was perfect
-            if (
-                child_node.residual.height == current_item.length
-                and child_node.residual.width == current_item.width
-            ):
-                child_node.type = current_item.id
-                return (current_node, True)
 
         case 3:  # Instead of 4-cut, do trimming
 
@@ -581,8 +611,8 @@ def place_4_cut(node: Node, item: Item) -> Place:
         # Can I place it down?
         if not node.residual.has_defect_in(
             node.residual.x,
-            node.residual.y,
             node.residual.x + node.residual.width,
+            node.residual.y,
             node.residual.y + item.length,
         ):
             return Place.DOWN
@@ -590,8 +620,8 @@ def place_4_cut(node: Node, item: Item) -> Place:
         # Can I place it up?
         elif not node.residual.has_defect_in(
             node.residual.x,
-            node.residual.y + node.residual.height - item.length,
             node.residual.x + node.residual.width,
+            node.residual.y + node.residual.height - item.length,
             node.residual.y + node.residual.height,
         ):
             return Place.UP
@@ -724,3 +754,24 @@ def find_up_to_y(current_node: Node, cut_place: int):
         ]
 
     return cut_place
+
+
+def sum_waste_area(root: Node) -> int:
+    """
+    Utility function to calculate the amount of waste in a tree. (Given by ChatGPT).
+    """
+
+    # DFS or recursive traversal function to sum areas of waste nodes
+    def dfs(node: Node):
+        total_area = 0
+        if node.type == -1:  # It's a waste node
+            total_area += node.height * node.width
+
+        # Traverse the children
+        for child in node.children:
+            total_area += dfs(child)
+
+        return total_area
+
+    # Start DFS from the root node
+    return dfs(root)

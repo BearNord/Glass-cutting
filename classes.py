@@ -94,9 +94,7 @@ class Item:
         """
         Rotates the item 90 degrees.
         """
-        width = self.width 
-        self.width = self.length
-        self.length = width
+        self.width, self.length = self.length, self.width
 
 
 @dataclass
@@ -171,9 +169,9 @@ class Residual:
                     x_low < defect.x < x_high
                     or x_low < defect.x + defect.width < x_high
                     or (x_low >= defect.x and x_high <= defect.x + defect.width)
-                )  # and has defect in x values
+                )  # and has defect in y values
                 and (
-                    y_low < defect.y < x_high
+                    y_low < defect.y < y_high  # TODO test x_high
                     or y_low < defect.y + defect.height < y_high
                     or (y_low >= defect.y and y_high <= defect.y + defect.height)
                 )
@@ -328,6 +326,18 @@ class Node:
     children: List["Node"] = field(default_factory=list)
     been_4_cut: bool = False
 
+    def get_root(self):
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
+
+    def last_descendant(self):
+        node = self
+        while node.children:
+            node = node.children[-1]
+        return node
+
     # Class-level attribute to automatically assign IDs
     _id_counter: int = field(init=False, repr=False, default=0)
     id: int = field(init=False)
@@ -338,6 +348,6 @@ class Node:
         Node._id_counter += 1
 
     @classmethod
-    def reset_id_counter(cls):
+    def reset_id_counter(cls, value: int = 0):
         """Reset the class-level ID counter to 0."""
-        cls._id_counter = 0
+        cls._id_counter = value
