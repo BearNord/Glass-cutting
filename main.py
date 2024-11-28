@@ -16,7 +16,7 @@ def run_all(dataset="A"):
 def run_one(param="A1"):
     start_time = perf_counter()
 
-    solution_trees = solve(param, 2)
+    solution_trees = solve(param, 2, True)
 
     convert_to_solution_file(solution_trees, param)
     end_time = perf_counter()
@@ -25,5 +25,5 @@ def run_one(param="A1"):
 
 
 if __name__ == "__main__":
-    # run_one("A3")
+    # run_one("A2")
     run_all("A")

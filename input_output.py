@@ -1,7 +1,8 @@
 import os
 import pandas as pd
-from classes import Bin, Batch, Item, Stack, Defect, Node, WIDTH_PLATES, HEIGHT_PLATES
+import sys
 from typing import Optional, List
+from classes import Bin, Batch, Item, Stack, Defect, Node, WIDTH_PLATES, HEIGHT_PLATES
 
 
 def read_instance(id: str = "A1") -> tuple[list[Bin], Batch]:
@@ -171,3 +172,21 @@ def convert_to_solution_file(trees: List[Node], id="A1"):
     # save to CSV
     csv_file_path = os.path.join("solutions", f"{id}_solution.csv")
     df.to_csv(csv_file_path, sep=";", index=False)
+
+
+def draw_loading_bar(total, current, length=50, fill="█"):
+    """
+    Draws a dynamic loading bar on the terminal.
+
+    :param total: Total number of iterations (100% completion).
+    :param current: Current progress.
+    :param length: Length of the loading bar.
+    :param fill: Character to use for the filled part of the bar.
+    """
+    percent = f"{100 * (current / float(total)):.1f}"
+    filled_length = int(length * current // total)
+    bar = fill * filled_length + "-" * (length - filled_length)
+    sys.stdout.write(f"\r|{bar}| {percent}%")
+    sys.stdout.flush()
+    if current == total:
+        sys.stdout.write("\n")  # Move to the next line when done

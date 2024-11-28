@@ -1,4 +1,4 @@
-from input_output import read_instance, convert_to_solution_file
+from input_output import read_instance, convert_to_solution_file, draw_loading_bar
 from classes import (
     Bin,
     Item,
@@ -25,13 +25,18 @@ log = True
 MAX_WASTE = WIDTH_PLATES * HEIGHT_PLATES * 100
 
 
-def backtrack_solve(id: str = "A1", max_depth: int = 1):
+def backtrack_solve(
+    id: str = "A1", max_depth: int = 1, extended_waste_calculation=False
+):
     print(f"Started backtrack solve algorithm for {id}")
     # trees containts the root nodes of the output
     trees: list[Node] = []
 
     # Read input
     bins, batch = read_instance(id)
+
+    number_of_items = sum(len(stack.sequence) for stack in batch.stacks)
+    placed_items = 0
 
     # Construct the root and the residual
     current_node = start_new_bin(bins, trees)
@@ -42,7 +47,15 @@ def backtrack_solve(id: str = "A1", max_depth: int = 1):
 
         # Solve with backtrack
         id_to_reset = trees[-1].last_descendant().id + 1
-        backtrack(batch.stacks, [], 0, min_items, current_node, max_depth)
+        backtrack(
+            batch.stacks,
+            [],
+            0,
+            min_items,
+            current_node,
+            max_depth,
+            extended_waste_calculation,
+        )
         Node.reset_id_counter(id_to_reset)
 
         # If no item could be cut
@@ -61,7 +74,8 @@ def backtrack_solve(id: str = "A1", max_depth: int = 1):
             for stack in batch.stacks:
                 if stack.sequence and stack.sequence[0].id == current_item.id:
                     if log:
-                        print(f"\t\titem {current_item.id} is placed.")
+                        placed_items += 1
+                        draw_loading_bar(number_of_items, placed_items)
                     stack.sequence.pop(0)
                     current_node, _ = place_item(current_item, current_node)
 
@@ -749,6 +763,13 @@ def find_right_to_x(current_node: Node, cut_place: int):
         current_node.residual.y + current_node.residual.height,
     )
 
+    # Filter out defects that start or end at cut_place #TODO test
+    defects = [
+        defect
+        for defect in defects
+        if not (defect.x == cut_place or defect.x + defect.width == cut_place)
+    ]
+
     # Move to the right until we can cut
     while defects:
         cut_place = max(defect.x + defect.width for defect in defects)
@@ -787,6 +808,13 @@ def find_up_to_y(current_node: Node, cut_place: int):
         cut_place - 1,
         cut_place + 1,
     )
+
+    # Filter out defects that start or end at cut_place # TODO test
+    defects = [
+        defect
+        for defect in defects
+        if not (defect.y == cut_place or defect.y + defect.height == cut_place)
+    ]
 
     # Move to the right until we can cut
     while defects:
@@ -854,6 +882,12 @@ def backtrack(
             while temp_node.parent is not None:
                 waste += temp_node.residual.width * temp_node.residual.height
                 temp_node = temp_node.parent
+
+            # If the stack list is empty
+            if not stacks:
+                root = current_node.get_root()
+                # the residual node is not a waste
+                waste -= root.residual.width * root.residual.height
 
         # return waste
         return waste
