@@ -9,20 +9,76 @@ from classes import (
     MIN_1_CUT,
     MIN_2_CUT,
     MIN_WASTE,
+    WIDTH_PLATES,
+    HEIGHT_PLATES,
 )
 from typing import List, Tuple
 from copy import deepcopy, copy
+from pprint import pprint
 
 
 # TODO max distance between 1-cuts: 3500 (except residual)
 # TODO must contain at least one 1-cut
 
 # TODO merge place_4_cut and trim
-# TODO (Optional) Don't do waste cut for 1-cut
+log = True
+MAX_WASTE = WIDTH_PLATES * HEIGHT_PLATES * 100
 
-# TODO rotate_item function
 
-log = False
+def backtrack_solve(id: str = "A1", max_depth: int = 1):
+    print(f"Started backtrack solve algorithm for {id}")
+    # trees containts the root nodes of the output
+    trees: list[Node] = []
+
+    # Read input
+    bins, batch = read_instance(id)
+
+    # Construct the root and the residual
+    current_node = start_new_bin(bins, trees)
+
+    # While there are items to cut
+    while batch.stacks:
+        min_items: list[Item] = []
+
+        # Solve with backtrack
+        id_to_reset = trees[-1].last_descendant().id + 1
+        backtrack(batch.stacks, [], 0, min_items, current_node, max_depth)
+        Node.reset_id_counter(id_to_reset)
+
+        # If no item could be cut
+        if not min_items:
+            # Finish the previous tree
+            make_node(current_node).type = -1
+            while current_node.parent is not None:
+                current_node = current_node.parent
+                make_node(current_node).type = -1
+
+            # Start new tree
+            current_node = start_new_bin(bins, trees)
+
+        # Cut items
+        for current_item in min_items:
+            for stack in batch.stacks:
+                if stack.sequence and stack.sequence[0].id == current_item.id:
+                    if log:
+                        print(f"\t\titem {current_item.id} is placed.")
+                    stack.sequence.pop(0)
+                    current_node, _ = place_item(current_item, current_node)
+
+        # Drop empty stacks
+        batch.stacks = [stack for stack in batch.stacks if stack.sequence]
+
+    # If the last node is not the root, all nodes to the root should be waste
+    while current_node.parent is not None:
+        make_node(current_node).type = -1
+        current_node = current_node.parent
+
+    # The last waste is a residual
+    make_node(trees[-1]).type = -3
+
+    # Return solution
+    print(f"\tFinished first fit solve algorithm for {id}")
+    return trees
 
 
 def first_fit_with_rotate(id: str = "A1"):
@@ -116,7 +172,6 @@ def first_fit_with_rotate(id: str = "A1"):
     make_node(trees[-1]).type = -3
 
     # Return solution
-
     print(f"\tFinished first fit solve algorithm for {id}")
 
     return trees
@@ -166,9 +221,7 @@ def first_fit_solve(id: str = "A1"):
     make_node(trees[-1]).type = -3
 
     # Return solution
-
     print(f"\tFinished first fit solve algorithm for {id}")
-
     return trees
 
 
@@ -234,8 +287,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 # Find the smallest x were we can cut
                 cut_place = find_right_to_x(
                     current_node,
-                    current_node.residual.x
-                    + MIN_1_CUT,  # TODO? + MIN_WASTE (csak optimalizáció lehetne)
+                    current_node.residual.x + MIN_1_CUT,
                 )
 
             # If the remaining residual would be too small
@@ -758,11 +810,17 @@ def find_up_to_y(current_node: Node, cut_place: int):
 
 def sum_waste_area(root: Node) -> int:
     """
-    Utility function to calculate the amount of waste in a tree. (Given by ChatGPT).
+    Calculates the total area of waste nodes in a subtree using depth-first search (DFS).
+
+    Parameters:
+        root (Node): The root of the subtree.
+
+    Returns:
+        int: The total waste area, computed as the sum of `height * width` for all waste nodes.
     """
 
     # DFS or recursive traversal function to sum areas of waste nodes
-    def dfs(node: Node):
+    def dfs(node: Node) -> int:
         total_area = 0
         if node.type == -1:  # It's a waste node
             total_area += node.height * node.width
@@ -775,3 +833,113 @@ def sum_waste_area(root: Node) -> int:
 
     # Start DFS from the root node
     return dfs(root)
+
+
+def backtrack(
+    stacks: list[Stack],
+    item_list: list[Item],
+    current_depth: int,
+    min_items: list[Item],
+    current_node: Node,
+    max_depth: int = 1,
+    extended_waste_calculation=False,
+) -> int:
+    # If we are too deep, then calculate the waste area and return
+    if current_depth == max_depth:
+        waste = sum_waste_area(current_node.get_root())
+
+        if extended_waste_calculation:
+            # Sum the wastes up to the root
+            temp_node = current_node
+            while temp_node.parent is not None:
+                waste += temp_node.residual.width * temp_node.residual.height
+                temp_node = temp_node.parent
+
+        # return waste
+        return waste
+
+    # smallest_waste = infinity
+    smallest_waste = MAX_WASTE
+
+    # go through all possible items
+    for stack_ind in range(len(stacks)):
+
+        # copy the stacks
+        new_stacks = deepcopy(stacks)
+        current_item = new_stacks[stack_ind].sequence.pop(0)
+        if not new_stacks[stack_ind].sequence:
+            new_stacks.pop(stack_ind)
+
+        item_list.append(current_item)
+
+        # Make a copy for rotated and original case, so we can try both
+        node_for_original = deepcopy(current_node)
+        node_for_rotated = deepcopy(current_node)
+
+        # Run the place_item for the original item
+        node_for_original, original_success = place_item(
+            current_item, node_for_original
+        )
+
+        # Make a rotated version of the item, and run place_item on it
+        rotated_item = copy(current_item)
+        rotated_item.rotate()
+        node_for_rotated, rotated_success = place_item(rotated_item, node_for_rotated)
+
+        # If the original could be cut
+        if original_success:
+            orig_waste = backtrack(
+                new_stacks,
+                item_list,
+                current_depth + 1,
+                min_items,
+                node_for_original,
+                max_depth,
+                extended_waste_calculation,
+            )
+            if smallest_waste > orig_waste:
+                smallest_waste = orig_waste
+                min_items.clear()
+                min_items.extend(item_list)  # Update the list in place
+                # min_items = deepcopy(item_list)
+
+        # If the rotated could be cut
+        if rotated_success:
+            item_list[-1] = rotated_item
+            rotated_waste = backtrack(
+                new_stacks,
+                item_list,
+                current_depth + 1,
+                min_items,
+                node_for_rotated,
+                max_depth,
+                extended_waste_calculation,
+            )
+            if smallest_waste > rotated_waste:
+                smallest_waste = rotated_waste
+                min_items.clear()
+                min_items.extend(item_list)  # Update the list in place
+                # min_items = deepcopy(item_list)
+
+        item_list.pop()
+
+    # If there was no placeable item
+    if smallest_waste == MAX_WASTE:
+        waste = sum_waste_area(current_node.get_root())
+
+        # Sum the wastes up to the root
+        temp_node = current_node
+        waste += temp_node.residual.width * temp_node.residual.height
+        while temp_node.parent is not None:
+            temp_node = temp_node.parent
+            waste += temp_node.residual.width * temp_node.residual.height
+
+        # If the stack list is originally empty
+        if not stacks:
+            root = current_node.get_root()
+            # the residual node is not a waste
+            waste -= root.residual.width * root.residual.height
+
+        return waste
+
+    return smallest_waste
