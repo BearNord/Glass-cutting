@@ -122,7 +122,11 @@ def read_defects(file_path: str) -> list[Bin]:
     return bins
 
 
-def convert_to_solution_file(trees: List[Node], id="A1", output_path:str = "solutions"):
+def convert_to_solution_file(
+    trees: List[Node],
+    id="A1",
+    output_path=os.path.join("solutions", f"{id}_solution.csv"),
+):
     """
     Convert a solution of trees into the solution file format.
     Credit: ChatGPT
@@ -170,8 +174,7 @@ def convert_to_solution_file(trees: List[Node], id="A1", output_path:str = "solu
     df["PARENT"] = df["PARENT"].astype("Int64")
 
     # save to CSV
-    csv_file_path = os.path.join(output_path, f"{id}_solution.csv")
-    df.to_csv(csv_file_path, sep=";", index=False)
+    df.to_csv(output_path, sep=";", index=False)
 
 
 def draw_loading_bar(total, current, length=50, fill="█"):

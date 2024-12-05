@@ -140,24 +140,6 @@ class Residual:
     height: int
     defects: list[Defect]
 
-    def can_cut_x(self, x: int) -> bool:
-        """
-        Returns if one can cut through coordinate x.
-        """
-        for defect in self.defects:
-            if defect.x <= x <= defect.x + defect.width:
-                return False
-        return True
-
-    def can_cut_y(self, y: int) -> bool:
-        """
-        Returns if one can cut through coordinate y.
-        """
-        for defect in self.defects:
-            if defect.y <= y <= defect.y + defect.width:
-                return False
-        return True
-
     def has_defect_in(self, x_low: int, x_high: int, y_low: int, y_high: int) -> bool:
         """
         Returns if there is a defect in a rectangle defined by parameters.
@@ -171,7 +153,7 @@ class Residual:
                     or (x_low >= defect.x and x_high <= defect.x + defect.width)
                 )  # and has defect in y values
                 and (
-                    y_low < defect.y < y_high  # TODO test x_high
+                    y_low < defect.y < y_high
                     or y_low < defect.y + defect.height < y_high
                     or (y_low >= defect.y and y_high <= defect.y + defect.height)
                 )
@@ -297,7 +279,6 @@ class Node:
 
     Attributes:
         plate_id (int): ID of the plate in the current cutting pattern.
-        id (int): Unique identifier for this node.
         x (int): X-coordinate of the node's bottom-left corner.
         y (int): Y-coordinate of the node's bottom-left corner.
         width (int): Node's width.
@@ -310,7 +291,8 @@ class Node:
         cut (int): Cut type:
             - 0: Plate.
             - 1-4: Specific cut type.
-        parent (Optional[Node]): Parent node, if any.
+        residual (Residual).
+        parent Node: Parent node. Root node's parent points to itself.
         children (List[Node]): List of child nodes if it's a branch.
     """
 
@@ -322,13 +304,41 @@ class Node:
     type: int
     cut: int
     residual: Residual
-    parent: Optional["Node"] = None
+    parent: "Node"
     children: List["Node"] = field(default_factory=list)
-    been_4_cut: bool = False
+
+    @classmethod
+    def create_root(
+        cls,
+        plate_id: int,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        type: int,
+        cut: int,
+        residual: Residual,
+    ) -> "Node":
+        """
+        Factory method to create a root node with `parent` set to itself.
+        """
+        root = cls(
+            plate_id=plate_id,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            type=type,
+            cut=cut,
+            residual=residual,
+            parent=field(init=False),
+        )
+        root.parent = root  # Set parent to self
+        return root
 
     def get_root(self):
         node = self
-        while node.parent is not None:
+        while node.parent != node:
             node = node.parent
         return node
 
@@ -346,6 +356,10 @@ class Node:
         # Automatically assign and increment the ID
         self.id = Node._id_counter
         Node._id_counter += 1
+
+        # Set parent to self for the root node (when no parent is provided)
+        if not hasattr(self, "parent"):
+            self.parent = self
 
     @classmethod
     def reset_id_counter(cls, value: int = 0):
