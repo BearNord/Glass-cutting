@@ -62,7 +62,7 @@ def backtrack_solve(
         if not min_items:
             # Finish the previous tree
             make_node(current_node).type = -1
-            while current_node.parent is not None:
+            while current_node.parent != current_node:
                 current_node = current_node.parent
                 make_node(current_node).type = -1
 
@@ -83,7 +83,7 @@ def backtrack_solve(
         batch.stacks = [stack for stack in batch.stacks if stack.sequence]
 
     # If the last node is not the root, all nodes to the root should be waste
-    while current_node.parent is not None:
+    while current_node.parent != current_node:
         make_node(current_node).type = -1
         current_node = current_node.parent
 
@@ -178,7 +178,7 @@ def first_fit_with_rotate(id: str = "A1"):
                 current_node, _ = place_item(rotated_item, current_node)
 
     # If the last node is not the root, all nodes to the root should be waste
-    while current_node.parent is not None:
+    while current_node.parent != current_node:
         make_node(current_node).type = -1
         current_node = current_node.parent
 
@@ -227,7 +227,7 @@ def first_fit_solve(id: str = "A1"):
                 current_node, success = place_item(current_item, current_node)
 
     # If the last node is not the root, all nodes to the root should be waste
-    while current_node.parent is not None:
+    while current_node.parent != current_node:
         make_node(current_node).type = -1
         current_node = current_node.parent
 
@@ -256,7 +256,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
         # If there is no residual left, we don't need to make a waste from it
         if current_node.residual.width == 0 or current_node.residual.height == 0:
             # If this is the root
-            if current_node.parent is None:
+            if current_node.parent == current_node:
                 return current_node, False
             else:
                 return place_item(current_item, current_node.parent)
@@ -264,7 +264,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
         # Make a waste node from its residual
         make_node(current_node).type = -1
         # If this is the root
-        if current_node.parent is None:
+        if current_node.parent == current_node:
             return current_node, False
         else:
             return place_item(current_item, current_node.parent)
@@ -395,14 +395,13 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 ):
                     # This is a waste
                     make_node(current_node).type = -1
-                    if current_node.parent is not None:  # Only for typehinting
-                        return place_item(current_item, current_node.parent)
+                    return place_item(current_item, current_node.parent)
 
                 # Cut a big enough column, and solve for the remaining part
                 waste_node = vertical_cut(current_node, cut_place).type = -1
                 return place_item(current_item, current_node)
 
-            # CÉL: pontosan levágjuk az itemet (ami lehet hogy eleve pontosan érkezik)
+            # GOAL: perfectly cut the item (which can be perfect from the start)
 
             cut_place = find_right_to_x(current_node, x + current_item.width)
 
@@ -421,8 +420,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 ):
                     # this is a waste
                     make_node(current_node).type = -1
-                    if current_node.parent is not None:  # Only for typehinting
-                        return place_item(current_item, current_node.parent)
+                    return place_item(current_item, current_node.parent)
 
                 child_node = vertical_cut(current_node, cut_place)
 
@@ -455,21 +453,21 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
                 else:  # there would not be enough space on the right part
                     # This is a waste
                     make_node(current_node).type = -1
-                    if current_node.parent is not None:  # Only for typehinting
-                        return place_item(current_item, current_node.parent)
+                    return place_item(current_item, current_node.parent)
 
         case 3:  # Instead of 4-cut, do trimming
 
             if current_item.length == current_node.height:
                 current_node.type = current_item.id
-                if current_node.parent is not None:  # Only for typehinting
-                    return current_node.parent, True
+                return current_node.parent, True
 
             current_node, success = trim(current_node, current_item)
             if success:
                 return current_node, success
             # Go up until we find usable residuals, and try to cut from it
-            while current_node.parent is not None and current_node.residual.width == 0:
+            while (
+                current_node.parent != current_node and current_node.residual.width == 0
+            ):
                 current_node = current_node.parent
             if current_node.residual.width != 0:
                 return place_item(current_item, current_node)
@@ -497,7 +495,7 @@ def start_new_bin(bins: list[Bin], trees: List[Node]) -> Node:
     bin = bins.pop(0)
 
     # Convert it into a root
-    root = Node(
+    root = Node.create_root(
         plate_id=bin.id,
         x=0,
         y=0,
@@ -658,43 +656,6 @@ def make_node(current_node: Node) -> Node:
     return child_node
 
 
-def place_4_cut(node: Node, item: Item) -> Place:
-    """
-    Decides where an item can be placed for a 4-cut.
-
-    Parameters:
-        - node (Node): The node where there is a 4-cut.
-        - item (Item): The item to place.
-
-    Returns:
-        - Place: An enum value indicating the suitable placement direction:
-            - Place.DOWN: Indicates a horizontal cut; down is suitable for the item.
-            - Place.UP: Indicates a horizontal cut; up is suitable for the item.
-            - Place.NONE: Indicates that the item cannot be placed.
-    """
-
-    if node.residual.width == item.width:
-        # Can I place it down?
-        if not node.residual.has_defect_in(
-            node.residual.x,
-            node.residual.x + node.residual.width,
-            node.residual.y,
-            node.residual.y + item.length,
-        ):
-            return Place.DOWN
-
-        # Can I place it up?
-        elif not node.residual.has_defect_in(
-            node.residual.x,
-            node.residual.x + node.residual.width,
-            node.residual.y + node.residual.height - item.length,
-            node.residual.y + node.residual.height,
-        ):
-            return Place.UP
-
-    return Place.NONE
-
-
 def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
     """
     Trims the given node by specified dimensions and returns a new trimmed node.
@@ -707,41 +668,48 @@ def trim(current_node: Node, current_item: Item) -> Tuple[Node, bool]:
     Returns:
         current_node (Node): A new `Node` instance representing the trimmed area of the original node.
     """
-    # Trimming: With 1 cut (horizontal) create 2 part: 1 item and 1 waste (or 2 items)
-    place = place_4_cut(current_node, current_item)
 
-    if place != Place.NONE:
-        # If not enough waste after cut
-        if current_node.residual.height - current_item.length < MIN_WASTE:
-            make_node(current_node).type = -1
-            return current_node, False
+    # If not enough waste after cut
+    if current_node.residual.height - current_item.length < MIN_WASTE:
+        make_node(current_node).type = -1
+        return current_node, False
 
-    match place:
-        case Place.DOWN:
+    if current_node.residual.width == current_item.width:
+        # Can I place it down?
+        if not current_node.residual.has_defect_in(
+            current_node.residual.x,
+            current_node.residual.x + current_node.residual.width,
+            current_node.residual.y,
+            current_node.residual.y + current_item.length,
+        ):
             # do horizontal cut, and down is suitable
             horizontal_cut(current_node, current_node.y + current_item.length).type = (
                 current_item.id
             )
             make_node(current_node).type = -1
 
-        case Place.UP:
+            return current_node.parent, True
+
+        # Can I place it up?
+        elif not current_node.residual.has_defect_in(
+            current_node.residual.x,
+            current_node.residual.x + current_node.residual.width,
+            current_node.residual.y
+            + current_node.residual.height
+            - current_item.length,
+            current_node.residual.y + current_node.residual.height,
+        ):
             # do horizontal cut, and up is suitable
             horizontal_cut(
                 current_node, current_node.y + current_node.height - current_item.length
             ).type = -1
             make_node(current_node).type = current_item.id
 
-        case Place.NONE:
-            # Cannot place item here with a 4-cut
-            make_node(current_node).type = -1
-            if current_node.parent is not None:
-                return current_node.parent, False
+            return current_node.parent, True
 
-    if current_node.parent is not None:
-        return current_node.parent, True
-
-    # only for typehinting... (never happens.... or at least it shouldn't)
-    return current_node, False
+    # Cannot place item here with a 4-cut
+    make_node(current_node).type = -1
+    return current_node.parent, False
 
 
 def find_right_to_x(current_node: Node, cut_place: int):
@@ -879,7 +847,7 @@ def backtrack(
         if extended_waste_calculation:
             # Sum the wastes up to the root
             temp_node = current_node
-            while temp_node.parent is not None:
+            while temp_node.parent != temp_node:
                 waste += temp_node.residual.width * temp_node.residual.height
                 temp_node = temp_node.parent
 
@@ -964,7 +932,7 @@ def backtrack(
         # Sum the wastes up to the root
         temp_node = current_node
         waste += temp_node.residual.width * temp_node.residual.height
-        while temp_node.parent is not None:
+        while temp_node.parent != temp_node:
             temp_node = temp_node.parent
             waste += temp_node.residual.width * temp_node.residual.height
 

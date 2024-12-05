@@ -292,7 +292,7 @@ class Node:
             - 0: Plate.
             - 1-4: Specific cut type.
         residual (Residual).
-        parent (Optional[Node]): Parent node, if any.
+        parent Node: Parent node. Root node's parent points to itself.
         children (List[Node]): List of child nodes if it's a branch.
     """
 
@@ -304,12 +304,41 @@ class Node:
     type: int
     cut: int
     residual: Residual
-    parent: Optional["Node"] = None
+    parent: "Node"
     children: List["Node"] = field(default_factory=list)
+
+    @classmethod
+    def create_root(
+        cls,
+        plate_id: int,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        type: int,
+        cut: int,
+        residual: Residual,
+    ) -> "Node":
+        """
+        Factory method to create a root node with `parent` set to itself.
+        """
+        root = cls(
+            plate_id=plate_id,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            type=type,
+            cut=cut,
+            residual=residual,
+            parent=field(init=False),
+        )
+        root.parent = root  # Set parent to self
+        return root
 
     def get_root(self):
         node = self
-        while node.parent is not None:
+        while node.parent != node:
             node = node.parent
         return node
 
@@ -327,6 +356,10 @@ class Node:
         # Automatically assign and increment the ID
         self.id = Node._id_counter
         Node._id_counter += 1
+
+        # Set parent to self for the root node (when no parent is provided)
+        if not hasattr(self, "parent"):
+            self.parent = self
 
     @classmethod
     def reset_id_counter(cls, value: int = 0):
