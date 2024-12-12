@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import sys
+import csv
 from typing import Optional, List
 from classes import Bin, Batch, Item, Stack, Defect, Node, WIDTH_PLATES, HEIGHT_PLATES
 
@@ -193,3 +194,12 @@ def draw_loading_bar(total, current, length=50, fill="█"):
     sys.stdout.flush()
     if current == total:
         sys.stdout.write("\n")  # Move to the next line when done
+
+
+def write_to_csv(filename: str, data: list[tuple[str, float, float]]):
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        # Optional: write a header row
+        writer.writerow(["ID", "Runtime", "Waste"])
+        # Write the data rows
+        writer.writerows(data)

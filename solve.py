@@ -15,18 +15,19 @@ from classes import (
 from typing import List, Tuple
 from copy import deepcopy, copy
 from pprint import pprint
+from math import log
 
 
 # TODO max distance between 1-cuts: 3500 (except residual)
 # TODO must contain at least one 1-cut
 
 # TODO merge place_4_cut and trim
-log = True
 MAX_WASTE = WIDTH_PLATES * HEIGHT_PLATES * 100
+to_log = True
 
 
 def backtrack_solve(
-    id: str = "A1", max_depth: int = 1, extended_waste_calculation=False
+    id: str = "A1", max_depth: int = 1, extended_waste_calculation=False, cut_all=True
 ):
     print(f"Started backtrack solve algorithm for {id}")
     # trees containts the root nodes of the output
@@ -70,10 +71,20 @@ def backtrack_solve(
             current_node = start_new_bin(bins, trees)
 
         # Cut items
-        for current_item in min_items:
+        if cut_all:
+            for current_item in min_items:
+                for stack in batch.stacks:
+                    if stack.sequence and stack.sequence[0].id == current_item.id:
+                        if to_log:
+                            placed_items += 1
+                            draw_loading_bar(number_of_items, placed_items)
+                        stack.sequence.pop(0)
+                        current_node, _ = place_item(current_item, current_node)
+        elif min_items:
+            current_item = min_items[0]
             for stack in batch.stacks:
                 if stack.sequence and stack.sequence[0].id == current_item.id:
-                    if log:
+                    if to_log:
                         placed_items += 1
                         draw_loading_bar(number_of_items, placed_items)
                     stack.sequence.pop(0)
@@ -215,11 +226,6 @@ def first_fit_solve(id: str = "A1"):
         while current_stack.sequence:
             # Remove first item from current_stack
             current_item: Item = current_stack.sequence.pop(0)
-
-            if log == True:
-                print(
-                    f"Trying to place item: {current_item.id} into bin {current_node.plate_id}"
-                )
 
             current_node, success = place_item(current_item, current_node)
             while not success:
@@ -477,7 +483,7 @@ def place_item(current_item: Item, current_node: Node) -> Tuple[Node, bool]:
     return place_item(current_item, child_node)
 
 
-def start_new_bin(bins: list[Bin], trees: List[Node]) -> Node:
+def start_new_bin(bins: list[Bin], trees: list[Node]) -> Node:
     """
     Creates a new root node from the first bin in `bins` and adds it to `trees`.
 
@@ -841,7 +847,10 @@ def backtrack(
     extended_waste_calculation=False,
 ) -> int:
     # If we are too deep, then calculate the waste area and return
-    if current_depth == max_depth:
+    depth_limit = (
+        int(log(20000, max(2, (2 * len(stacks))))) if max_depth == -1 else max_depth
+    )
+    if current_depth == depth_limit:
         waste = sum_waste_area(current_node.get_root())
 
         if extended_waste_calculation:
@@ -945,3 +954,13 @@ def backtrack(
         return waste
 
     return smallest_waste
+
+
+def objective_function(trees: list[Node]) -> int:
+    return sum(sum_waste_area(tree) for tree in trees)
+
+
+def waste_proportion(trees: list[Node]) -> float:
+    return round(
+        100 * objective_function(trees) / (len(trees) * WIDTH_PLATES * HEIGHT_PLATES), 4
+    )
